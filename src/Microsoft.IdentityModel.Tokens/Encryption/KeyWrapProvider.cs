@@ -39,7 +39,7 @@ namespace Microsoft.IdentityModel.Tokens
         public byte[] AuthenticationTag { get; set; }
     }
 
-    public abstract class KeyWrapProvider
+    public class KeyWrapProvider
     {
         protected KeyWrapProvider(SecurityKey key, string algorithm)
         {
@@ -54,10 +54,19 @@ namespace Microsoft.IdentityModel.Tokens
 
         public SecurityKey Key { get; private set; }
 
-        public abstract byte[] DecryptKey(byte[] key);
+        public virtual byte[] DecryptKey(byte[] key)
+        {
+            return new byte[0];
+        }
 
-        public abstract KeyWrapResult EncryptKey(byte[] key);
+        public virtual KeyWrapResult EncryptKey(byte[] key)
+        {
+            return new KeyWrapResult();
+        }
 
-        public abstract bool IsSupportedAlgorithm(SecurityKey key, string algorithm);
+        public virtual bool IsSupportedAlgorithm(SecurityKey key, string algorithm)
+        {
+            return true;
+        }
     }
 }

@@ -27,41 +27,29 @@
 
 using System;
 using System.Collections.Generic;
+using Xunit;
 
-namespace Microsoft.IdentityModel.Tokens
+namespace Microsoft.IdentityModel.Tokens.Tests
 {
-    public class AuthenticatedKeyWrapProvider : KeyWrapProvider
+    /// <summary>
+    /// Tests for KeyWrapProvider
+    /// Constructors
+    ///     - validate parameters (null, empty)
+    ///     - algorithms supported
+    ///     - properties are set correctly (Algorithm, Context, Key)
+    /// EncryptKey/DecryptKey
+    ///     - positive tests for keys (128, 256) X Algorithms or RSA key supported.
+    ///     - parameter validation for Encrypt
+    /// Decrypt
+    ///     - parameter validataion for Decrypt
+    /// DecryptMismatch
+    ///     - negative tests for switching (keys, algorithms)
+    /// EncryptVirtual
+    ///     - tests virtual method was called
+    /// DecryptVirtual
+    ///     - tests virtual method was called
+    /// </summary>
+    public class KeyWrapProviderTests
     {
-        public AuthenticatedKeyWrapProvider(SecurityKey key, string algorithm)
-            : base(key, algorithm)
-        {
-        }
-
-        public override byte[] DecryptKey(byte[] key)
-        {
-            throw new NotSupportedException("requires ...");
-        }
-
-        // do we need byte[] aad as a parameter?
-        public virtual byte[] DecryptKey(byte[] key, byte[] aad, byte[] iv, byte[] tag)
-        {
-            return new byte[0];
-        }
-
-        public override KeyWrapResult EncryptKey(byte[] key)
-        {
-            throw new NotSupportedException("requires ...");
-        }
-
-        // do we need byte[] aad as a parameter? Same as above
-        public virtual KeyWrapResult EncryptKey(byte[] key, byte[] aad)
-        {
-            return new KeyWrapResult();
-        }
-
-        public override bool IsSupportedAlgorithm(SecurityKey key, string algorithm)
-        {
-            return true;
-        }
     }
 }
