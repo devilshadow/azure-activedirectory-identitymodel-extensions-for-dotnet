@@ -256,6 +256,29 @@ namespace Microsoft.IdentityModel.Tokens
         }
 
         /// <summary>
+        /// Creates an instance of <see cref="KeyWrapProvider"/> for a specific &lt;SecurityKey, Algorithm>.
+        /// </summary>
+        /// <param name="key">the <see cref="SecurityKey"/> to use.</param>
+        /// <param name="algorithm">the algorithm to use.</param>
+        /// <returns>an instance of <see cref="KeyWrapProvider"/></returns>
+        /// <exception cref="ArgumentNullException">'key' is null.</exception>
+        /// <exception cref="ArgumentNullException">'algorithm' is null or empty.</exception>
+        /// <exception cref="ArgumentException">If <see cref="SecurityKey"/> and algorithm pair are not supported.</exception>
+        public virtual KeyWrapProvider CreateKeyWrapProvider(SecurityKey key, string algorithm)
+        {
+            if (key == null)
+                throw LogHelper.LogArgumentNullException(nameof(key));
+
+            if (string.IsNullOrEmpty(algorithm))
+                throw LogHelper.LogArgumentNullException(nameof(algorithm));
+
+            if (IsSupportedAlgorithm(algorithm, key))
+                return new KeyWrapProvider(key, algorithm);
+
+            throw LogHelper.LogExceptionMessage(new ArgumentException(String.Format(CultureInfo.InvariantCulture, LogMessages.IDX10658, key, algorithm)));
+        }
+
+        /// <summary>
         /// Creates a <see cref="SignatureProvider"/> that supports the <see cref="SecurityKey"/> and algorithm.
         /// </summary>
         /// <param name="key">The <see cref="SecurityKey"/> to use for signing.</param>

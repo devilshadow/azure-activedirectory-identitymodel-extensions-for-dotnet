@@ -32,19 +32,19 @@ using Microsoft.IdentityModel.Logging;
 
 namespace Microsoft.IdentityModel.Tokens
 {
-    public class KeyWrapResult
-    {
-        public byte[] Ciphertext { get; set; }
-
-        public byte[] iv { get; set; }
-
-        public byte[] AuthenticationTag { get; set; }
-    }
-
+    /// <summary>
+    /// Provides Wrap key and UnWrap key services.
+    /// </summary>
     public class KeyWrapProvider
     {
-        private readonly static byte[] defaultIV = new byte[] { 0xA6, 0xA6, 0xA6, 0xA6, 0xA6, 0xA6, 0xA6, 0xA6 };
-
+        /// <summary>
+        /// Initializes a new instance of the <see cref="KeyWrapProvider"/> class used for wrap key and unwrap key.
+        /// <param name="key">The <see cref="SecurityKey"/> that will be used for crypto operations.</param>
+        /// <param name="algorithm">The KeyWrap algorithm to apply.</param>
+        /// <exception cref="ArgumentNullException">'key' is null.</exception>
+        /// <exception cref="ArgumentNullException">'algorithm' is null or whitespace.</exception>
+        /// <exception cref="ArgumentOutOfRangeException">If <see cref="SecurityKey"/> and algorithm pair are not supported.</exception>
+        /// </summary>
         public KeyWrapProvider(SecurityKey key, string algorithm)
         {
             if (key == null)
@@ -53,84 +53,157 @@ namespace Microsoft.IdentityModel.Tokens
             if (string.IsNullOrWhiteSpace(algorithm))
                 throw LogHelper.LogArgumentNullException(nameof(algorithm));
 
-            if(!IsSupportedAlgorithm(key, algorithm))
-                throw LogHelper.LogExceptionMessage(new ArgumentException(nameof(algorithm), String.Format(CultureInfo.InvariantCulture, LogMessages.IDX10652, algorithm)));
+            if (!IsSupportedAlgorithm(key, algorithm))
+                throw LogHelper.LogExceptionMessage(new ArgumentOutOfRangeException(nameof(algorithm), string.Format(CultureInfo.InvariantCulture, LogMessages.IDX10652, algorithm)));
 
             Algorithm = algorithm;
             Key = key;
         }
 
+        /// <summary>
+        /// Gets the KeyWrap algorithm that is being used.
+        /// </summary>
         public string Algorithm { get; private set; }
 
+        /// <summary>
+        /// Gets or sets a user context for a <see cref="KeyWrapProvider"/>.
+        /// </summary>
+        /// <remarks>This is null by default. This can be used by runtimes or for extensibility scenarios.</remarks>
         public string Context { get; set; }
 
+        /// <summary>
+        /// Gets the <see cref="SecurityKey"/> that is being used.
+        /// </summary>
         public SecurityKey Key { get; private set; }
 
-        public virtual byte[] DecryptKey(byte[] key)
+        /// <summary>
+        /// UnWrap the wrappedKey
+        /// </summary>
+        /// <param name="wrappedKey">the wrapped key to unwrap.</param>
+        /// <returns>Unwrap wrappted key</returns>
+        /// <exception cref="ArgumentNullException">'wrappedKey' is null or empty.</exception>
+        /// <exception cref="ArgumentException">'Key' is not a <see cref="SymmetricSecurityKey"/>.</exception>
+        /// <exception cref="KeyWrapUnwrapException">Failed to unwrap the wrapptedKey.</exception>
+        /// <exception cref="ArgumentOutOfRangeException">The algorithm is not supported.</exception>
+        public virtual byte[] UnWrapKey(byte[] wrappedKey)
         {
-            return new byte[0];
-        }
+            if (wrappedKey == null || wrappedKey.Length == 0)
+                throw LogHelper.LogArgumentNullException(nameof(wrappedKey));
 
-        public virtual KeyWrapResult EncryptKey(byte[] key)
-        {
-            if (key == null || key.Length == 0)
-                throw LogHelper.LogArgumentNullException(nameof(key));
-
-            KeyWrapResult result = new KeyWrapResult();
-
-            if (SecurityAlgorithms.Aes128KW.Equals(Algorithm, StringComparison.Ordinal))
+            if (IsSymmetricAlgorithmSupported(Algorithm))
             {
                 SymmetricSecurityKey symmetricKey = Key as SymmetricSecurityKey;
                 if (symmetricKey == null)
-                    throw LogHelper.LogExceptionMessage(new ArgumentException(string.Format(CultureInfo.InvariantCulture, LogMessages.IDX10655, key.GetType())));
+                    throw LogHelper.LogExceptionMessage(new ArgumentException(string.Format(CultureInfo.InvariantCulture, LogMessages.IDX10655, wrappedKey.GetType())));
 
-                Aes aes = Aes.Create();
-                aes.Mode = CipherMode.ECB;
-                aes.Padding = PaddingMode.None;
-                aes.Key = symmetricKey.Key;
-                aes.IV = defaultIV;
-                result.Ciphertext = Utility.Transform(aes.CreateEncryptor(), key, 0, key.Length);
+                ValidateKeySize(symmetricKey, Algorithm);
+                if (SecurityAlgorithms.Aes128KW.Equals(Algorithm, StringComparison.Ordinal))
+                {
+                    try
+                    {
+                        AesKw128 aesKw128 = new AesKw128();
+                        return aesKw128.CreateDecryptor(symmetricKey.Key).TransformFinalBlock(wrappedKey, 0, wrappedKey.Length);
+                    }
+                    catch (Exception ex)
+                    {
+                        throw LogHelper.LogExceptionMessage(new KeyWrapUnwrapException(string.Format(CultureInfo.InvariantCulture, LogMessages.IDX10657, ex)));
+                    }
+                }
+                else if (SecurityAlgorithms.Aes256KW.Equals(Algorithm, StringComparison.Ordinal))
+                {
+                    try
+                    {
+                        AesKw256 aesKw256 = new AesKw256();
+                        return aesKw256.CreateDecryptor(symmetricKey.Key).TransformFinalBlock(wrappedKey, 0, wrappedKey.Length);
+                    }
+                    catch (Exception ex)
+                    {
+                        throw LogHelper.LogExceptionMessage(new KeyWrapUnwrapException(string.Format(CultureInfo.InvariantCulture, LogMessages.IDX10657, ex)));
+                    }
+                }
+                else
+                    throw LogHelper.LogExceptionMessage(new ArgumentOutOfRangeException(nameof(Algorithm), string.Format(CultureInfo.InvariantCulture, LogMessages.IDX10652, Algorithm)));
             }
-            else if (SecurityAlgorithms.Aes256KW.Equals(Algorithm, StringComparison.Ordinal))
-            { }
-            else if (SecurityAlgorithms.RsaPKCS1.Equals(Algorithm, StringComparison.Ordinal))
-            { }
-            else if (SecurityAlgorithms.RsaOAEP.Equals(Algorithm, StringComparison.Ordinal))
-            { }
-            else
-            {
 
-            }
+            throw LogHelper.LogExceptionMessage(new ArgumentOutOfRangeException(nameof(Algorithm), string.Format(CultureInfo.InvariantCulture, LogMessages.IDX10652, Algorithm)));
         }
 
-        public virtual bool IsSupportedAlgorithm(SecurityKey key, string algorithm)
+        /// <summary>
+        /// Wrap the 'keyToWrap'
+        /// </summary>
+        /// <param name="keyToWrap">the key to be wrappted.</param>
+        /// <returns>The wrappted key</returns>
+        /// <exception cref="ArgumentNullException">'keyToWrap' is null or empty.</exception>
+        /// <exception cref="ArgumentException">'Key' is not a <see cref="SymmetricSecurityKey"/>.</exception>
+        /// <exception cref="KeyWrapWrapException">Failed to wrap the keyToWrap.</exception>
+        /// <exception cref="ArgumentOutOfRangeException">The algorithm is not supported.</exception>
+        public virtual byte[] WrapKey(byte[] keyToWrap)
         {
-            if (key == null)
-                throw LogHelper.LogArgumentNullException(nameof(key));
+            if (keyToWrap == null || keyToWrap.Length == 0)
+                throw LogHelper.LogArgumentNullException(nameof(keyToWrap));
 
-            if (string.IsNullOrWhiteSpace(algorithm))
-                throw LogHelper.LogArgumentNullException(nameof(algorithm));
+            if (IsSymmetricAlgorithmSupported(Algorithm))
+            {
+                SymmetricSecurityKey symmetricKey = Key as SymmetricSecurityKey;
+                if (symmetricKey == null)
+                    throw LogHelper.LogExceptionMessage(new ArgumentException(string.Format(CultureInfo.InvariantCulture, LogMessages.IDX10655, keyToWrap.GetType())));
 
+                ValidateKeySize(symmetricKey, Algorithm);
+                if (SecurityAlgorithms.Aes128KW.Equals(Algorithm, StringComparison.Ordinal))
+                {
+                    try
+                    {
+                        AesKw128 aesKw128 = new AesKw128();
+                        return aesKw128.CreateEncryptor(symmetricKey.Key).TransformFinalBlock(keyToWrap, 0, keyToWrap.Length);
+                    }
+                    catch (Exception ex)
+                    {
+                        throw LogHelper.LogExceptionMessage(new KeyWrapWrapException(string.Format(CultureInfo.InvariantCulture, LogMessages.IDX10656, ex)));
+                    }
+                }
+                else if (SecurityAlgorithms.Aes256KW.Equals(Algorithm, StringComparison.Ordinal))
+                {
+                    try
+                    {
+                        AesKw256 aesKw256 = new AesKw256();
+                        return aesKw256.CreateEncryptor(symmetricKey.Key).TransformFinalBlock(keyToWrap, 0, keyToWrap.Length);
+                    }
+                    catch (Exception ex)
+                    {
+                        throw LogHelper.LogExceptionMessage(new KeyWrapWrapException(string.Format(CultureInfo.InvariantCulture, LogMessages.IDX10656, ex)));
+                    }
+                }
+                else
+                    throw LogHelper.LogExceptionMessage(new ArgumentOutOfRangeException(nameof(Algorithm), string.Format(CultureInfo.InvariantCulture, LogMessages.IDX10652, Algorithm)));
+            }
+
+            throw LogHelper.LogExceptionMessage(new ArgumentOutOfRangeException(nameof(Algorithm), string.Format(CultureInfo.InvariantCulture, LogMessages.IDX10652, Algorithm)));
+        }
+
+        /// <summary>
+        /// Answers if an algorithm is supported
+        /// </summary>
+        /// <param name="key">the <see cref="SecurityKey"/></param>
+        /// <param name="algorithm">the algorithm to use</param>
+        /// <returns>true if the algorithm is supported; otherwise, false.</returns>
+        protected virtual bool IsSupportedAlgorithm(SecurityKey key, string algorithm)
+        {
+            if (key as SymmetricSecurityKey != null)
+                return IsSymmetricAlgorithmSupported(algorithm);
+
+            return false;
+        }
+
+        private bool IsSymmetricAlgorithmSupported(string algorithm)
+        {
             switch (algorithm)
             {
                 case SecurityAlgorithms.Aes128KW:
                 case SecurityAlgorithms.Aes256KW:
-                    {
-                        SymmetricSecurityKey symmetricKey = key as SymmetricSecurityKey;
-                        if (symmetricKey == null)
-                            throw LogHelper.LogExceptionMessage(new ArgumentException(string.Format(CultureInfo.InvariantCulture, LogMessages.IDX10655, key.GetType())));
-
-                        ValidateKeySize(symmetricKey, algorithm);
-                        return true;
-                    }
-
-                case SecurityAlgorithms.RsaPKCS1:
-                case SecurityAlgorithms.RsaOAEP:
                     return true;
-
-                default:
-                    return false;
             }
+
+            return false;
         }
 
         private void ValidateKeySize(SymmetricSecurityKey key, string algorithm)
