@@ -25,6 +25,7 @@
 //
 //------------------------------------------------------------------------------
 
+using System;
 using Xunit;
 
 namespace Microsoft.IdentityModel.Tokens.Tests
@@ -103,6 +104,55 @@ namespace Microsoft.IdentityModel.Tokens.Tests
             public override string ToString()
             {
                 return TestId + ", " + Algorithm + ", " + EncryptionKey.KeyId + ", " + DecryptionKey.KeyId;
+            }
+        }
+
+#pragma warning disable CS3016 // Arrays as attribute arguments is not CLS-compliant
+        [Theory, MemberData("KeyWrapTheoryData")]
+#pragma warning restore CS3016 // Arrays as attribute arguments is not CLS-compliant
+        public void KeyWrapReferenceTest(KeyWrapTestParams testParams)
+        {
+            var keyWrapProvider = CryptoProviderFactory.Default.CreateKeyWrapProvider(testParams.Key, testParams.Algorithm);
+            byte[] wrapptedKey = keyWrapProvider.WrapKey(testParams.KeyToWrap);
+            byte[] unWrapptedKey = keyWrapProvider.UnWrapKey(wrapptedKey);
+
+            Assert.True(Utility.AreEqual(wrapptedKey, testParams.EncryptedKey), "Utility.AreEqual(wrapptedKey, testParams.EncryptedKey)");
+            Assert.True(string.Equals(Base64UrlEncoder.Encode(wrapptedKey), testParams.EncodedEncryptedKey, StringComparison.Ordinal), "string.Equals(Base64UrlEncoder.Encode(wrapptedKey), testParams.EncodedEncryptedKey)");
+            Assert.True(Utility.AreEqual(unWrapptedKey, testParams.KeyToWrap), "Utility.AreEqual(unWrapptedKey, testParams.KeyToWrap)");
+        }
+
+        public static TheoryData<KeyWrapTestParams> KeyWrapTheoryData
+        {
+            get
+            {
+                var theoryData = new TheoryData<KeyWrapTestParams>();
+
+                theoryData.Add(new KeyWrapTestParams
+                {
+                    Algorithm = AES128_KeyWrap.Algorithm,
+                    Key = new SymmetricSecurityKey(Base64UrlEncoder.DecodeBytes(AES128_KeyWrap.K)),
+                    KeyToWrap = AES128_KeyWrap.CEK,
+                    EncryptedKey = AES128_KeyWrap.EncryptedKey,
+                    EncodedEncryptedKey = AES128_KeyWrap.EncodedEncryptedKey,
+                    TestId = "AES128_KeyWrap"
+                });
+
+                return theoryData;
+            }
+        }
+
+        public class KeyWrapTestParams
+        {
+            public string Algorithm { get; set; }
+            public SecurityKey Key { get; set; }
+            public byte[] KeyToWrap { get; set; }
+            public byte[] EncryptedKey { get; set; }
+            public string EncodedEncryptedKey { get; set; }
+            public string TestId { get; set; }
+
+            public override string ToString()
+            {
+                return TestId + ", " + Algorithm + ", " + Key.KeyId;
             }
         }
     }

@@ -210,6 +210,8 @@ namespace Microsoft.IdentityModel.Tokens
             {
                 case SecurityAlgorithms.Aes128CbcHmacSha256:
                 case SecurityAlgorithms.Aes256CbcHmacSha512:
+                case SecurityAlgorithms.Aes128KW:
+                case SecurityAlgorithms.Aes256KW:
                 case SecurityAlgorithms.HmacSha256Signature:
                 case SecurityAlgorithms.HmacSha384Signature:
                 case SecurityAlgorithms.HmacSha512Signature:

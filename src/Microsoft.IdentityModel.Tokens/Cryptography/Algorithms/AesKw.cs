@@ -38,8 +38,6 @@ namespace Microsoft.IdentityModel.Tokens
 
         static readonly byte[] _defaultIv = new byte[] { 0xA6, 0xA6, 0xA6, 0xA6, 0xA6, 0xA6, 0xA6, 0xA6 };
 
-   //     protected static RNGCryptoServiceProvider Rng = new RNGCryptoServiceProvider();
-
         protected AesKw( string name ) : base( name )
         {
             
@@ -113,7 +111,6 @@ namespace Microsoft.IdentityModel.Tokens
                 _aes.Padding = PaddingMode.None;
                 _aes.KeySize = keyBytes.Length * 8;
                 _aes.Key = keyBytes;
-                //_aes = new RijndaelManaged { Mode = CipherMode.ECB, Padding = PaddingMode.None, KeySize = keyBytes.Length*8, Key = keyBytes };
 
                 // Set the AES IV to Zeroes
                 var aesIv = new byte[_aes.BlockSize >> 3];
@@ -276,7 +273,7 @@ namespace Microsoft.IdentityModel.Tokens
             internal AesKwDecryptor( byte[] keyBytes, byte[] iv )
             {
                 // Create the AES provider
-                //_aes = new RijndaelManaged { Mode = CipherMode.ECB, Padding = PaddingMode.None, KeySize = keyBytes.Length*8, Key = keyBytes };
+                _aes = Aes.Create();
                 _aes.Mode = CipherMode.ECB;
                 _aes.Padding = PaddingMode.None;
                 _aes.KeySize = keyBytes.Length * 8;
