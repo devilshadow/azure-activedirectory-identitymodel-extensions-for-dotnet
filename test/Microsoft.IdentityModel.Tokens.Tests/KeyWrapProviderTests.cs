@@ -37,11 +37,11 @@ namespace Microsoft.IdentityModel.Tokens.Tests
     ///     - validate parameters (null, empty)
     ///     - algorithms supported
     ///     - properties are set correctly (Algorithm, Context, Key)
-    /// EncryptKey/DecryptKey
-    ///     - positive tests for keys (128, 256) X Algorithms or RSA key supported.
-    ///     - parameter validation for Encrypt
+    /// WrapKey/UnWrapKey
+    ///     - positive tests for keys (128, 256) X Algorithms supported.
+    ///     - parameter validation for WrapKey
     /// Decrypt
-    ///     - parameter validataion for Decrypt
+    ///     - parameter validataion for UnWrapKey
     /// DecryptMismatch
     ///     - negative tests for switching (keys, algorithms)
     /// EncryptVirtual
@@ -51,5 +51,54 @@ namespace Microsoft.IdentityModel.Tokens.Tests
     /// </summary>
     public class KeyWrapProviderTests
     {
+#pragma warning disable CS3016 // Arrays as attribute arguments is not CLS-compliant
+        [Theory, MemberData("KeyWrapConstructorTheoryData")]
+#pragma warning restore CS3016 // Arrays as attribute arguments is not CLS-compliant
+        public void Constructors(string testId, SecurityKey key, string algorithm, ExpectedException ee)
+        {
+            try
+            {
+                var context = Guid.NewGuid().ToString();
+                var provider = new KeyWrapProvider(key, algorithm) { Context = context };
+
+                ee.ProcessNoException();
+
+                Assert.Equal(provider.Algorithm, algorithm);
+                Assert.Equal(provider.Context, context);
+                Assert.True(ReferenceEquals(provider.Key, key));
+            }
+            catch (Exception ex)
+            {
+                ee.ProcessException(ex);
+            }
+        }
+
+        public static TheoryData<string, SecurityKey, string, ExpectedException> KeyWrapConstructorTheoryData()
+        {
+            var theoryData = new TheoryData<string, SecurityKey, string, ExpectedException>();
+
+            theoryData.Add("Test1", null, null, ExpectedException.ArgumentNullException());
+            theoryData.Add("Test2", Default.SymmetricEncryptionKey128, null, ExpectedException.ArgumentNullException());
+            theoryData.Add("Test3", Default.SymmetricEncryptionKey128, SecurityAlgorithms.Aes128Encryption, ExpectedException.ArgumentException("IDX10661:"));
+            theoryData.Add("Test4", Default.SymmetricEncryptionKey128, SecurityAlgorithms.Aes128KW, ExpectedException.NoExceptionExpected);
+            theoryData.Add("Test5", Default.SymmetricEncryptionKey256, SecurityAlgorithms.Aes256KW, ExpectedException.NoExceptionExpected);
+
+            JsonWebKey key = new JsonWebKey();
+            key.Kty = JsonWebAlgorithmsKeyTypes.Octet;
+            theoryData.Add("Test6", key, SecurityAlgorithms.Aes256KW, ExpectedException.ArgumentException("IDX10657:"));
+            theoryData.Add("Test7", Default.SymmetricEncryptionKey128, SecurityAlgorithms.Aes256KW, ExpectedException.ArgumentOutOfRangeException("IDX10662:"));
+            theoryData.Add("Test8", Default.SymmetricEncryptionKey256, SecurityAlgorithms.Aes128KW, ExpectedException.ArgumentOutOfRangeException("IDX10662:"));
+            theoryData.Add("Test9", Default.SymmetricEncryptionKey256, SecurityAlgorithms.Aes256CbcHmacSha512, ExpectedException.ArgumentOutOfRangeException("IDX10652:"));
+
+            return theoryData;
+        }
+
+//#pragma warning disable CS3016 // Arrays as attribute arguments is not CLS-compliant
+//        [Theory, MemberData("DecryptTheoryData")]
+//#pragma warning restore CS3016 // Arrays as attribute arguments is not CLS-compliant
+//        public void UnWrapKey()
+//        { }
+
+
     }
 }

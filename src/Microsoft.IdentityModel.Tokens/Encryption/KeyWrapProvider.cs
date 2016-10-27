@@ -76,6 +76,8 @@ namespace Microsoft.IdentityModel.Tokens
         /// </summary>
         /// <returns></returns>
         /// <exception cref="ArgumentException">The <see cref="SecurityKey"/> cannot be converted to byte array</exception>
+        /// <exception cref="ArgumentOutOfRangeException">The keysize doesn't match the algorithm.</exception>
+        /// <exception cref="ArgumentOutOfRangeException">The algorithm doesn't support algorithm.</exception>
         /// <exception cref="InvalidOperationException">Failed to create symmetric algorithm with provided key and algorithm.</exception>
         protected virtual SymmetricAlgorithm GetSymmetricAlgorithm()
         {
@@ -293,7 +295,7 @@ namespace Microsoft.IdentityModel.Tokens
                 return;
             }
 
-            throw LogHelper.LogExceptionMessage(new ArgumentException(nameof(algorithm), String.Format(CultureInfo.InvariantCulture, LogMessages.IDX10652, algorithm)));
+            throw LogHelper.LogExceptionMessage(new ArgumentOutOfRangeException(nameof(algorithm), String.Format(CultureInfo.InvariantCulture, LogMessages.IDX10652, algorithm)));
         }
 
         /// <summary>
