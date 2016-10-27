@@ -37,6 +37,12 @@ namespace Microsoft.IdentityModel.Tokens
     /// </summary>
     public class KeyWrapProvider
     {
+        private static readonly byte[] _defaultIv = new byte[] { 0xA6, 0xA6, 0xA6, 0xA6, 0xA6, 0xA6, 0xA6, 0xA6 };
+        private static readonly int BlockSizeInBits = 64;
+        private static readonly int BlockSizeInBytes = BlockSizeInBits >> 3;
+
+        private Aes _aes;
+
         /// <summary>
         /// Initializes a new instance of the <see cref="KeyWrapProvider"/> class used for wrap key and unwrap key.
         /// <param name="key">The <see cref="SecurityKey"/> that will be used for crypto operations.</param>
@@ -53,8 +59,44 @@ namespace Microsoft.IdentityModel.Tokens
             if (string.IsNullOrWhiteSpace(algorithm))
                 throw LogHelper.LogArgumentNullException(nameof(algorithm));
 
-            if (!IsSupportedAlgorithm(key, algorithm))
-                throw LogHelper.LogExceptionMessage(new ArgumentOutOfRangeException(nameof(algorithm), string.Format(CultureInfo.InvariantCulture, LogMessages.IDX10652, algorithm)));
+            if (!key.CryptoProviderFactory.IsSupportedAlgorithm(algorithm, key))
+                throw LogHelper.LogExceptionMessage(new ArgumentException(String.Format(CultureInfo.InvariantCulture, LogMessages.IDX10661, algorithm, key)));
+
+            byte[] keyBytes = null;
+
+            SymmetricSecurityKey symmetricSecurityKey = key as SymmetricSecurityKey;
+            if (symmetricSecurityKey != null)
+                keyBytes = symmetricSecurityKey.Key;
+            else
+            {
+                JsonWebKey jsonWebKey = key as JsonWebKey;
+                if (jsonWebKey != null && jsonWebKey.K != null)
+                    keyBytes = Base64UrlEncoder.DecodeBytes(jsonWebKey.K);
+            }
+
+            if (keyBytes == null)
+                throw LogHelper.LogExceptionMessage(new ArgumentException(string.Format(CultureInfo.InvariantCulture, LogMessages.IDX10657, key.GetType())));
+
+            ValidateKeySize(keyBytes, algorithm);
+
+            try
+            {
+                // Create the AES provider
+                _aes = Aes.Create();
+                _aes.Mode = CipherMode.ECB;
+                _aes.Padding = PaddingMode.None;
+                _aes.KeySize = keyBytes.Length * 8;
+                _aes.Key = keyBytes;
+
+                // Set the AES IV to Zeroes
+                var aesIv = new byte[_aes.BlockSize >> 3];
+                aesIv.Zero();
+                _aes.IV = aesIv;
+            }
+            catch (Exception ex)
+            {
+                throw LogHelper.LogExceptionMessage(new InvalidOperationException(String.Format(CultureInfo.InvariantCulture, LogMessages.IDX10663, key, algorithm), ex));
+            }
 
             Algorithm = algorithm;
             Key = key;
@@ -90,42 +132,14 @@ namespace Microsoft.IdentityModel.Tokens
             if (wrappedKey == null || wrappedKey.Length == 0)
                 throw LogHelper.LogArgumentNullException(nameof(wrappedKey));
 
-            if (IsSymmetricAlgorithmSupported(Algorithm))
+            try
             {
-                SymmetricSecurityKey symmetricKey = Key as SymmetricSecurityKey;
-                if (symmetricKey == null)
-                    throw LogHelper.LogExceptionMessage(new ArgumentException(string.Format(CultureInfo.InvariantCulture, LogMessages.IDX10655, wrappedKey.GetType())));
-
-                ValidateKeySize(symmetricKey, Algorithm);
-                if (SecurityAlgorithms.Aes128KW.Equals(Algorithm, StringComparison.Ordinal))
-                {
-                    try
-                    {
-                        AesKw128 aesKw128 = new AesKw128();
-                        return aesKw128.CreateDecryptor(symmetricKey.Key).TransformFinalBlock(wrappedKey, 0, wrappedKey.Length);
-                    }
-                    catch (Exception ex)
-                    {
-                        throw LogHelper.LogExceptionMessage(new KeyWrapUnwrapException(string.Format(CultureInfo.InvariantCulture, LogMessages.IDX10657, ex)));
-                    }
-                }
-                else if (SecurityAlgorithms.Aes256KW.Equals(Algorithm, StringComparison.Ordinal))
-                {
-                    try
-                    {
-                        AesKw256 aesKw256 = new AesKw256();
-                        return aesKw256.CreateDecryptor(symmetricKey.Key).TransformFinalBlock(wrappedKey, 0, wrappedKey.Length);
-                    }
-                    catch (Exception ex)
-                    {
-                        throw LogHelper.LogExceptionMessage(new KeyWrapUnwrapException(string.Format(CultureInfo.InvariantCulture, LogMessages.IDX10657, ex)));
-                    }
-                }
-                else
-                    throw LogHelper.LogExceptionMessage(new ArgumentOutOfRangeException(nameof(Algorithm), string.Format(CultureInfo.InvariantCulture, LogMessages.IDX10652, Algorithm)));
+                return UnWrapFromFinalBlock(wrappedKey, 0, wrappedKey.Length);
             }
-
-            throw LogHelper.LogExceptionMessage(new ArgumentOutOfRangeException(nameof(Algorithm), string.Format(CultureInfo.InvariantCulture, LogMessages.IDX10652, Algorithm)));
+            catch (Exception ex)
+            {
+                throw LogHelper.LogExceptionMessage(new KeyWrapUnwrapException(string.Format(CultureInfo.InvariantCulture, LogMessages.IDX10659, ex)));
+            }
         }
 
         /// <summary>
@@ -142,42 +156,26 @@ namespace Microsoft.IdentityModel.Tokens
             if (keyToWrap == null || keyToWrap.Length == 0)
                 throw LogHelper.LogArgumentNullException(nameof(keyToWrap));
 
-            if (IsSymmetricAlgorithmSupported(Algorithm))
+            try
             {
-                SymmetricSecurityKey symmetricKey = Key as SymmetricSecurityKey;
-                if (symmetricKey == null)
-                    throw LogHelper.LogExceptionMessage(new ArgumentException(string.Format(CultureInfo.InvariantCulture, LogMessages.IDX10655, keyToWrap.GetType())));
+                return WrapFromFinalBlock(keyToWrap, 0, keyToWrap.Length);
+            }
+            catch (Exception ex)
+            {
+                throw LogHelper.LogExceptionMessage(new KeyWrapWrapException(string.Format(CultureInfo.InvariantCulture, LogMessages.IDX10658, ex)));
+            }
+        }
 
-                ValidateKeySize(symmetricKey, Algorithm);
-                if (SecurityAlgorithms.Aes128KW.Equals(Algorithm, StringComparison.Ordinal))
-                {
-                    try
-                    {
-                        AesKw128 aesKw128 = new AesKw128();
-                        return aesKw128.CreateEncryptor(symmetricKey.Key).TransformFinalBlock(keyToWrap, 0, keyToWrap.Length);
-                    }
-                    catch (Exception ex)
-                    {
-                        throw LogHelper.LogExceptionMessage(new KeyWrapWrapException(string.Format(CultureInfo.InvariantCulture, LogMessages.IDX10656, ex)));
-                    }
-                }
-                else if (SecurityAlgorithms.Aes256KW.Equals(Algorithm, StringComparison.Ordinal))
-                {
-                    try
-                    {
-                        AesKw256 aesKw256 = new AesKw256();
-                        return aesKw256.CreateEncryptor(symmetricKey.Key).TransformFinalBlock(keyToWrap, 0, keyToWrap.Length);
-                    }
-                    catch (Exception ex)
-                    {
-                        throw LogHelper.LogExceptionMessage(new KeyWrapWrapException(string.Format(CultureInfo.InvariantCulture, LogMessages.IDX10656, ex)));
-                    }
-                }
-                else
-                    throw LogHelper.LogExceptionMessage(new ArgumentOutOfRangeException(nameof(Algorithm), string.Format(CultureInfo.InvariantCulture, LogMessages.IDX10652, Algorithm)));
+        private static byte[] GetBytes(UInt64 i)
+        {
+            byte[] temp = BitConverter.GetBytes(i);
+
+            if (BitConverter.IsLittleEndian)
+            {
+                Array.Reverse(temp);
             }
 
-            throw LogHelper.LogExceptionMessage(new ArgumentOutOfRangeException(nameof(Algorithm), string.Format(CultureInfo.InvariantCulture, LogMessages.IDX10652, Algorithm)));
+            return temp;
         }
 
         /// <summary>
@@ -206,25 +204,233 @@ namespace Microsoft.IdentityModel.Tokens
             return false;
         }
 
-        private void ValidateKeySize(SymmetricSecurityKey key, string algorithm)
+        private void ValidateKeySize(byte[] key, string algorithm)
         {
             if (SecurityAlgorithms.Aes128KW.Equals(algorithm, StringComparison.Ordinal))
             {
-                if (key.Key.Length < 16)
-                    throw LogHelper.LogExceptionMessage(new ArgumentOutOfRangeException("key.KeySize", string.Format(CultureInfo.InvariantCulture, LogMessages.IDX10653, SecurityAlgorithms.Aes128KW, 128, key.KeyId, key.Key.Length << 3)));
+                if (key.Length != 16)
+                    throw LogHelper.LogExceptionMessage(new ArgumentOutOfRangeException("key.KeySize", string.Format(CultureInfo.InvariantCulture, LogMessages.IDX10662, SecurityAlgorithms.Aes128KW, 128, Key.KeyId, key.Length << 3)));
 
                 return;
             }
 
             if (SecurityAlgorithms.Aes256KW.Equals(algorithm, StringComparison.Ordinal))
             {
-                if (key.Key.Length < 32)
-                    throw LogHelper.LogExceptionMessage(new ArgumentOutOfRangeException("key.KeySize", string.Format(CultureInfo.InvariantCulture, LogMessages.IDX10653, SecurityAlgorithms.Aes256KW, 256, key.KeyId, key.Key.Length << 3)));
+                if (key.Length != 32)
+                    throw LogHelper.LogExceptionMessage(new ArgumentOutOfRangeException("key.KeySize", string.Format(CultureInfo.InvariantCulture, LogMessages.IDX10662, SecurityAlgorithms.Aes256KW, 256, Key.KeyId, key.Length << 3)));
 
                 return;
             }
 
             throw LogHelper.LogExceptionMessage(new ArgumentException(nameof(algorithm), String.Format(CultureInfo.InvariantCulture, LogMessages.IDX10652, algorithm)));
+        }
+
+        private byte[] UnWrapFromFinalBlock( byte[] inputBuffer, int inputOffset, int inputCount )
+        {
+            if (inputBuffer == null)
+                throw new ArgumentNullException("inputBuffer");
+
+            if (inputBuffer.Length == 0)
+                throw new ArgumentNullException("inputBuffer", "The length of the inputBuffer parameter cannot be zero");
+
+            if (inputCount <= 0)
+                throw new ArgumentOutOfRangeException("inputCount", "The inputCount parameter must not be zero or negative");
+
+            if (inputCount % 8 != 0)
+                throw new ArgumentOutOfRangeException("inputCount", "The inputCount parameter must be a multiple of 64 bits");
+
+            if (inputOffset < 0)
+                throw new ArgumentOutOfRangeException("inputOffset", "The inputOffset parameter must not be negative");
+
+            if (inputOffset + inputCount > inputBuffer.Length)
+                throw new ArgumentOutOfRangeException("inputCount", "The sum of inputCount and inputOffset parameters must not be larger than the length of inputBuffer");
+
+
+            /*
+                1) Initialize variables.
+
+                    Set A = C[0]
+                    For i = 1 to n
+                        R[i] = C[i]
+
+                2) Compute intermediate values.
+
+                    For j = 5 to 0
+                        For i = n to 1
+                            B = AES-1(K, (A ^ t) | R[i]) where t = n*j+i
+                            A = MSB(64, B)
+                            R[i] = LSB(64, B)
+
+                3) Output results.
+
+                If A is an appropriate initial value (see 2.2.3),
+                Then
+                    For i = 1 to n
+                        P[i] = R[i]
+                Else
+                    Return an error
+            */
+
+            byte[] iv = _defaultIv.Clone() as byte[];
+
+            // A = C[0]
+            byte[] a = new byte[BlockSizeInBytes];
+
+            Array.Copy(inputBuffer, inputOffset, a, 0, BlockSizeInBytes);
+
+            // The number of input blocks
+            var n = (inputCount - BlockSizeInBytes) >> 3;
+
+            // The set of input blocks
+            byte[] r = new byte[n << 3];
+
+            Array.Copy(inputBuffer, inputOffset + BlockSizeInBytes, r, 0, inputCount - BlockSizeInBytes);
+
+            var encryptor = _aes.CreateDecryptor();
+            byte[] block = new byte[16];
+
+            // Calculate intermediate values
+            for (var j = 5; j >= 0; j--)
+            {
+                for (var i = n; i > 0; i--)
+                {
+                    // T = ( n * j ) + i
+                    var t = (ulong)((n * j) + i);
+
+                    // B = AES-1(K, (A ^ t) | R[i] )
+
+                    // First, A = ( A ^ t )
+                    a.Xor(GetBytes(t), true);
+
+                    // Second, block = ( A | R[i] )
+                    Array.Copy(a, block, BlockSizeInBytes);
+                    Array.Copy(r, (i - 1) << 3, block, BlockSizeInBytes, BlockSizeInBytes);
+
+                    // Third, b = AES-1( block )
+                    var b = encryptor.TransformFinalBlock(block, 0, 16);
+
+                    // A = MSB(64, B)
+                    Array.Copy(b, a, BlockSizeInBytes);
+
+                    // R[i] = LSB(64, B)
+                    Array.Copy(b, BlockSizeInBytes, r, (i - 1) << 3, BlockSizeInBytes);
+                }
+            }
+
+            if (a.SequenceEqualConstantTime(iv))
+            {
+                var c = new byte[n << 3];
+
+                for (var i = 0; i < n; i++)
+                {
+                    Array.Copy(r, i << 3, c, i << 3, 8);
+                }
+
+                return c;
+            }
+            else
+            {
+                throw new CryptographicException("Data is not authentic");
+            }
+        }
+
+        private byte[] WrapFromFinalBlock(byte[] inputBuffer, int inputOffset, int inputCount)
+        {
+            if (inputBuffer == null)
+                throw new ArgumentNullException("inputBuffer");
+
+            if (inputBuffer.Length == 0)
+                throw new ArgumentNullException("inputBuffer", "The length of the inputBuffer parameter cannot be zero");
+
+            if (inputCount <= 0)
+                throw new ArgumentOutOfRangeException("inputCount", "The inputCount parameter must not be zero or negative");
+
+            if (inputCount % 8 != 0)
+                throw new ArgumentOutOfRangeException("inputCount", "The inputCount parameter must be a multiple of 64 bits");
+
+            if (inputOffset < 0)
+                throw new ArgumentOutOfRangeException("inputOffset", "The inputOffset parameter must not be negative");
+
+            if (inputOffset + inputCount > inputBuffer.Length)
+                throw new ArgumentOutOfRangeException("inputCount", "The sum of inputCount and inputOffset parameters must not be larger than the length of inputBuffer");
+
+
+            /*
+               1) Initialize variables.
+
+                   Set A = IV, an initial value (see 2.2.3)
+                   For i = 1 to n
+                       R[i] = P[i]
+
+               2) Calculate intermediate values.
+
+                   For j = 0 to 5
+                       For i=1 to n
+                           B = AES(K, A | R[i])
+                           A = MSB(64, B) ^ t where t = (n*j)+i
+                           R[i] = LSB(64, B)
+
+               3) Output the results.
+
+                   Set C[0] = A
+                   For i = 1 to n
+                       C[i] = R[i]
+            */
+
+            byte[] iv = _defaultIv.Clone() as byte[];
+
+            // The default initialization vector from RFC3394
+            byte[] a = iv;
+
+            // The number of input blocks
+            var n = inputCount >> 3;
+
+            // The set of input blocks
+            byte[] r = new byte[n << 3];
+
+            Array.Copy(inputBuffer, inputOffset, r, 0, inputCount);
+
+            var encryptor = _aes.CreateEncryptor();
+            byte[] block = new byte[16];
+
+            // Calculate intermediate values
+            for (var j = 0; j < 6; j++)
+            {
+                for (var i = 0; i < n; i++)
+                {
+                    // T = ( n * j ) + i
+                    var t = (ulong)((n * j) + i + 1);
+
+                    // B = AES( K, A | R[i] )
+
+                    // First, block = A | R[i]
+                    Array.Copy(a, block, a.Length);
+                    Array.Copy(r, i << 3, block, 64 >> 3, 64 >> 3);
+
+                    // Second, AES( K, block )
+                    var b = encryptor.TransformFinalBlock(block, 0, 16);
+
+                    // A = MSB( 64, B )
+                    Array.Copy(b, a, 64 >> 3);
+
+                    // A = A ^ t
+                    a.Xor(GetBytes(t), true);
+
+                    // R[i] = LSB( 64, B )
+                    Array.Copy(b, 64 >> 3, r, i << 3, 64 >> 3);
+                }
+            }
+
+            var c = new byte[(n + 1) << 3];
+
+            Array.Copy(a, c, a.Length);
+
+            for (var i = 0; i < n; i++)
+            {
+                Array.Copy(r, i << 3, c, (i + 1) << 3, 8);
+            }
+
+            return c;
         }
     }
 }

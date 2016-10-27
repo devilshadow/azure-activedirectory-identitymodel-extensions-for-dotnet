@@ -97,9 +97,13 @@ namespace Microsoft.IdentityModel.Tokens
         internal const string IDX10654 = "IDX10654: Decryption failed. Crypto operation exception: '{0}'.";
         internal const string IDX10655 = "IDX10655: 'length' must be greater than 1: '{0}'";
         internal const string IDX10656 = "IDX10656: 'length' cannot be greater than signature.Length. length: '{0}', signature.Length: '{1}'.";
-        internal const string IDX10657 = "IDX10657: Unable to create KeyedHashAlgorithm for algorithm '{0}'.";
-        internal const string IDX10658 = "IDX10658: Unable to obtain required byte array for KeyHashAlgorithm from SecurityKey: '{0}'.";
-        internal const string IDX10659 = "IDX10659: Unable to create '{0}', algorithm '{1}'; key: '{2}' is not supported.";
+        internal const string IDX10657 = "IDX10657: The SecurityKey provided for Aes Key Wrap cannot be converted to byte array. Type is: '{0}'.";
+        internal const string IDX10658 = "IDX10658: WrapKey failed, exception from crypto operation: '{0}'";
+        internal const string IDX10659 = "IDX10659: UnWrapKey failed, exception from crypto operation: '{0}'";
+        internal const string IDX10660 = "IDX10660: The Key: '{0}' and algorithm: '{1}' pair are not supported.";
+        internal const string IDX10661 = "IDX10661: Unable to create the KeyWrapProvider.\n\nKeyWrapAlgorithm: '{0}', SecurityKey: '{1}'\n is not supported.";
+        internal const string IDX10662 = "IDX10662: The KeyWrap algorithm '{0}' requires a key size of '{1}' bits. Key '{2}', is of size:'{3}'.";
+        internal const string IDX10663 = "IDX10663: Failed to create KeyWrapProvider with SecurityKey: '{0}', KeyWrapAlgorithm: '{1}'.";
 
         // security keys
         internal const string IDX10700 = "IDX10700: Invalid RsaParameters: '{0}'. Both modulus and exponent should be present";

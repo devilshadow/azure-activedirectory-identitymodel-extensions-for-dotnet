@@ -114,10 +114,10 @@ namespace Microsoft.IdentityModel.Tokens.Tests
         {
             var keyWrapProvider = CryptoProviderFactory.Default.CreateKeyWrapProvider(testParams.Key, testParams.Algorithm);
             byte[] wrapptedKey = keyWrapProvider.WrapKey(testParams.KeyToWrap);
-            byte[] unWrapptedKey = keyWrapProvider.UnWrapKey(wrapptedKey);
-
             Assert.True(Utility.AreEqual(wrapptedKey, testParams.EncryptedKey), "Utility.AreEqual(wrapptedKey, testParams.EncryptedKey)");
             Assert.True(string.Equals(Base64UrlEncoder.Encode(wrapptedKey), testParams.EncodedEncryptedKey, StringComparison.Ordinal), "string.Equals(Base64UrlEncoder.Encode(wrapptedKey), testParams.EncodedEncryptedKey)");
+
+            byte[] unWrapptedKey = keyWrapProvider.UnWrapKey(wrapptedKey);
             Assert.True(Utility.AreEqual(unWrapptedKey, testParams.KeyToWrap), "Utility.AreEqual(unWrapptedKey, testParams.KeyToWrap)");
         }
 
