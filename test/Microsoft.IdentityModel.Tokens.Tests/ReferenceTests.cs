@@ -113,12 +113,12 @@ namespace Microsoft.IdentityModel.Tokens.Tests
         public void KeyWrapReferenceTest(KeyWrapTestParams testParams)
         {
             var keyWrapProvider = CryptoProviderFactory.Default.CreateKeyWrapProvider(testParams.Key, testParams.Algorithm);
-            byte[] wrapptedKey = keyWrapProvider.WrapKey(testParams.KeyToWrap);
-            Assert.True(Utility.AreEqual(wrapptedKey, testParams.EncryptedKey), "Utility.AreEqual(wrapptedKey, testParams.EncryptedKey)");
-            Assert.Equal(Base64UrlEncoder.Encode(wrapptedKey), testParams.EncodedEncryptedKey);
+            byte[] wrappedKey = keyWrapProvider.WrapKey(testParams.KeyToWrap);
+            Assert.True(Utility.AreEqual(wrappedKey, testParams.EncryptedKey), "Utility.AreEqual(wrappedKey, testParams.EncryptedKey)");
+            Assert.Equal(Base64UrlEncoder.Encode(wrappedKey), testParams.EncodedEncryptedKey);
 
-            byte[] unWrapptedKey = keyWrapProvider.UnWrapKey(wrapptedKey);
-            Assert.True(Utility.AreEqual(unWrapptedKey, testParams.KeyToWrap), "Utility.AreEqual(unWrapptedKey, testParams.KeyToWrap)");
+            byte[] unWrappedKey = keyWrapProvider.UnWrapKey(wrappedKey);
+            Assert.True(Utility.AreEqual(unWrappedKey, testParams.KeyToWrap), "Utility.AreEqual(unWrappedKey, testParams.KeyToWrap)");
         }
 
         public static TheoryData<KeyWrapTestParams> KeyWrapTheoryData

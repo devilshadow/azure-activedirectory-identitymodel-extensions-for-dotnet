@@ -320,6 +320,42 @@ namespace Microsoft.IdentityModel.Tokens.Tests
         }
     }
 
+    public class DerivedKeyWrapProvider : KeyWrapProvider
+    {
+        public DerivedKeyWrapProvider(SecurityKey key, string algorithm)
+            : base(key, algorithm)
+        {
+        }
+
+        public bool GetSymmetricAlgorithmCalled { get; set; } = false;
+        public bool IsSupportedAlgorithmCalled { get; set; } = false;
+        public bool UnWrapKeyCalled { get; set; } = false;
+        public bool WrapKeyCalled { get; set; } = false;
+        protected override SymmetricAlgorithm GetSymmetricAlgorithm()
+        {
+            GetSymmetricAlgorithmCalled = true;
+            return base.GetSymmetricAlgorithm();
+        }
+
+        protected override bool IsSupportedAlgorithm(SecurityKey key, string algorithm)
+        {
+            IsSupportedAlgorithmCalled = true;
+            return base.IsSupportedAlgorithm(key, algorithm);
+        }
+
+        public override byte[] UnWrapKey(byte[] wrappedKey)
+        {
+            UnWrapKeyCalled = true;
+            return base.UnWrapKey(wrappedKey);
+        }
+
+        public override byte[] WrapKey(byte[] keyToWrap)
+        {
+            WrapKeyCalled = true;
+            return base.WrapKey(keyToWrap);
+        }
+    }
+
     /// <summary>
     /// Useful for trigging an exception.
     /// </summary>

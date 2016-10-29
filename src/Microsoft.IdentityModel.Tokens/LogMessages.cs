@@ -105,6 +105,7 @@ namespace Microsoft.IdentityModel.Tokens
         internal const string IDX10662 = "IDX10662: The KeyWrap algorithm '{0}' requires a key size of '{1}' bits. Key '{2}', is of size:'{3}'.";
         internal const string IDX10663 = "IDX10663: Failed to create symmetric algorithm with SecurityKey: '{0}', KeyWrapAlgorithm: '{1}'.";
         internal const string IDX10664 = "IDX10664: The length of input must be a multiple of 64 bits.";
+        internal const string IDX10665 = "IDX10665: Data is not authentic";
 
         // security keys
         internal const string IDX10700 = "IDX10700: Invalid RsaParameters: '{0}'. Both modulus and exponent should be present";

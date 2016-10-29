@@ -166,7 +166,7 @@ namespace Microsoft.IdentityModel.Tokens
         /// <returns>Unwrap wrappted key</returns>
         /// <exception cref="ArgumentNullException">'wrappedKey' is null or empty.</exception>
         /// <exception cref="ArgumentException">The lenth of wrappedKey must be a multiple of 64 bits.</exception>
-        /// <exception cref="KeyWrapUnwrapException">Failed to unwrap the wrapptedKey.</exception>
+        /// <exception cref="KeyWrapUnwrapException">Failed to unwrap the wrappedKey.</exception>
         public virtual byte[] UnWrapKey(byte[] wrappedKey)
         {
             if (wrappedKey == null || wrappedKey.Length == 0)
@@ -273,7 +273,7 @@ namespace Microsoft.IdentityModel.Tokens
             }
             else
             {
-                throw new CryptographicException("Data is not authentic");
+                throw LogHelper.LogException<InvalidOperationException>(LogMessages.IDX10665);
             }
         }
 
