@@ -123,6 +123,27 @@ namespace Microsoft.IdentityModel.Tokens
             return false;
         }
 
+        private bool IsSupportedKeyWrapAlgorithm(string algorithm, SecurityKey key)
+        {
+            if (key == null)
+                return false;
+
+            if (string.IsNullOrEmpty(algorithm))
+                return false;
+
+            if (!(algorithm.Equals(SecurityAlgorithms.Aes128KW, StringComparison.Ordinal) || algorithm.Equals(SecurityAlgorithms.Aes256KW, StringComparison.Ordinal)))
+                return false;
+
+            if (key is SymmetricSecurityKey)
+                return true;
+
+            var jsonWebKey = key as JsonWebKey;
+            if (jsonWebKey != null)
+                return (jsonWebKey.K != null && jsonWebKey.Kty == JsonWebAlgorithmsKeyTypes.Octet);
+
+            return false;
+        }
+
         /// <summary>
         /// Checks if an 'algorithm, key' pair is supported.
         /// </summary>
@@ -266,6 +287,7 @@ namespace Microsoft.IdentityModel.Tokens
         /// <exception cref="ArgumentNullException">'key' is null.</exception>
         /// <exception cref="ArgumentNullException">'algorithm' is null or empty.</exception>
         /// <exception cref="ArgumentException">If <see cref="SecurityKey"/> and algorithm pair are not supported.</exception>
+        /// <exception cref="ArgumentException">'key' is not a <see cref="SymmetricSecurityKey"/>.</exception>
         public virtual KeyWrapProvider CreateKeyWrapProvider(SecurityKey key, string algorithm)
         {
             if (key == null)
@@ -274,7 +296,14 @@ namespace Microsoft.IdentityModel.Tokens
             if (string.IsNullOrEmpty(algorithm))
                 throw LogHelper.LogArgumentNullException(nameof(algorithm));
 
-            if (IsSupportedAlgorithm(algorithm, key))
+            if (CustomCryptoProvider != null && CustomCryptoProvider.IsSupportedAlgorithm(algorithm, key))
+            {
+                var cryptoProvider = CustomCryptoProvider.Create(algorithm, key) as KeyWrapProvider;
+                if (cryptoProvider == null)
+                    throw LogHelper.LogExceptionMessage(new InvalidOperationException(string.Format(CultureInfo.InvariantCulture, LogMessages.IDX10646, algorithm, key, typeof(KeyWrapProvider))));
+            }
+
+            if (IsSupportedKeyWrapAlgorithm(algorithm, key))
                 return new KeyWrapProvider(key, algorithm);
 
             throw LogHelper.LogExceptionMessage(new ArgumentException(String.Format(CultureInfo.InvariantCulture, LogMessages.IDX10658, key, algorithm)));

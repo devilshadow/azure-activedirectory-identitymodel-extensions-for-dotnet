@@ -117,8 +117,8 @@ namespace Microsoft.IdentityModel.Tokens.Tests
             Assert.True(Utility.AreEqual(wrappedKey, testParams.EncryptedKey), "Utility.AreEqual(wrappedKey, testParams.EncryptedKey)");
             Assert.Equal(Base64UrlEncoder.Encode(wrappedKey), testParams.EncodedEncryptedKey);
 
-            byte[] unWrappedKey = keyWrapProvider.UnWrapKey(wrappedKey);
-            Assert.True(Utility.AreEqual(unWrappedKey, testParams.KeyToWrap), "Utility.AreEqual(unWrappedKey, testParams.KeyToWrap)");
+            byte[] unwrappedKey = keyWrapProvider.UnwrapKey(wrappedKey);
+            Assert.True(Utility.AreEqual(unwrappedKey, testParams.KeyToWrap), "Utility.AreEqual(unwrappedKey, testParams.KeyToWrap)");
         }
 
         public static TheoryData<KeyWrapTestParams> KeyWrapTheoryData

@@ -329,7 +329,7 @@ namespace Microsoft.IdentityModel.Tokens.Tests
 
         public bool GetSymmetricAlgorithmCalled { get; set; } = false;
         public bool IsSupportedAlgorithmCalled { get; set; } = false;
-        public bool UnWrapKeyCalled { get; set; } = false;
+        public bool UnwrapKeyCalled { get; set; } = false;
         public bool WrapKeyCalled { get; set; } = false;
         protected override SymmetricAlgorithm GetSymmetricAlgorithm()
         {
@@ -343,10 +343,10 @@ namespace Microsoft.IdentityModel.Tokens.Tests
             return base.IsSupportedAlgorithm(key, algorithm);
         }
 
-        public override byte[] UnWrapKey(byte[] wrappedKey)
+        public override byte[] UnwrapKey(byte[] wrappedKey)
         {
-            UnWrapKeyCalled = true;
-            return base.UnWrapKey(wrappedKey);
+            UnwrapKeyCalled = true;
+            return base.UnwrapKey(wrappedKey);
         }
 
         public override byte[] WrapKey(byte[] keyToWrap)

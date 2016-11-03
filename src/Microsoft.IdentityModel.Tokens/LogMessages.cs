@@ -99,12 +99,12 @@ namespace Microsoft.IdentityModel.Tokens
         internal const string IDX10656 = "IDX10656: 'length' cannot be greater than signature.Length. length: '{0}', signature.Length: '{1}'.";
         internal const string IDX10657 = "IDX10657: The SecurityKey provided for the symmetric key wrap algorithm cannot be converted to byte array. Type is: '{0}'.";
         internal const string IDX10658 = "IDX10658: WrapKey failed, exception from crypto operation: '{0}'";
-        internal const string IDX10659 = "IDX10659: UnWrapKey failed, exception from crypto operation: '{0}'";
+        internal const string IDX10659 = "IDX10659: UnwrapKey failed, exception from crypto operation: '{0}'";
         internal const string IDX10660 = "IDX10660: The Key: '{0}' and algorithm: '{1}' pair are not supported.";
         internal const string IDX10661 = "IDX10661: Unable to create the KeyWrapProvider.\n\nKeyWrapAlgorithm: '{0}', SecurityKey: '{1}'\n is not supported.";
         internal const string IDX10662 = "IDX10662: The KeyWrap algorithm '{0}' requires a key size of '{1}' bits. Key '{2}', is of size:'{3}'.";
         internal const string IDX10663 = "IDX10663: Failed to create symmetric algorithm with SecurityKey: '{0}', KeyWrapAlgorithm: '{1}'.";
-        internal const string IDX10664 = "IDX10664: The length of input must be a multiple of 64 bits.";
+        internal const string IDX10664 = "IDX10664: The length of input must be a multiple of 64 bits. The input size is: '{0}' bits.";
         internal const string IDX10665 = "IDX10665: Data is not authentic";
 
         // security keys

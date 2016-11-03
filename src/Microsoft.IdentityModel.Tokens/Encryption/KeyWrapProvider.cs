@@ -33,13 +33,15 @@ using Microsoft.IdentityModel.Logging;
 namespace Microsoft.IdentityModel.Tokens
 {
     /// <summary>
-    /// Provides Wrap key and UnWrap key services.
+    /// Provides Wrap key and Unwrap key services.
     /// </summary>
     public class KeyWrapProvider
     {
         private static readonly byte[] _defaultIv = new byte[] { 0xA6, 0xA6, 0xA6, 0xA6, 0xA6, 0xA6, 0xA6, 0xA6 };
         private static readonly int BlockSizeInBits = 64;
         private static readonly int BlockSizeInBytes = BlockSizeInBits >> 3;
+        private static object encryptorLock = new object();
+        private static object decryptorLock = new object();
 
         private SymmetricAlgorithm _symmetricAlgorithm;
         private ICryptoTransform _symmetricAlgorithmEncryptor;
@@ -50,7 +52,7 @@ namespace Microsoft.IdentityModel.Tokens
         /// <param name="key">The <see cref="SecurityKey"/> that will be used for crypto operations.</param>
         /// <param name="algorithm">The KeyWrap algorithm to apply.</param>
         /// <exception cref="ArgumentNullException">'key' is null.</exception>
-        /// <exception cref="ArgumentNullException">'algorithm' is null or whitespace.</exception>
+        /// <exception cref="ArgumentNullException">'algorithm' is null.</exception>
         /// <exception cref="ArgumentException">If <see cref="SecurityKey"/> and algorithm pair are not supported.</exception>
         /// <exception cref="InvalidOperationException"><see cref="KeyWrapProvider.GetSymmetricAlgorithm"/> throws.</exception>
         /// </summary>
@@ -59,7 +61,7 @@ namespace Microsoft.IdentityModel.Tokens
             if (key == null)
                 throw LogHelper.LogArgumentNullException(nameof(key));
 
-            if (string.IsNullOrWhiteSpace(algorithm))
+            if (string.IsNullOrEmpty(algorithm))
                 throw LogHelper.LogArgumentNullException(nameof(algorithm));
 
             if (!IsSupportedAlgorithm(key, algorithm))
@@ -89,7 +91,7 @@ namespace Microsoft.IdentityModel.Tokens
             else
             {
                 JsonWebKey jsonWebKey = Key as JsonWebKey;
-                if (jsonWebKey != null && jsonWebKey.K != null)
+                if (jsonWebKey != null && jsonWebKey.K != null && jsonWebKey.Kty == JsonWebAlgorithmsKeyTypes.Octet)
                     keyBytes = Base64UrlEncoder.DecodeBytes(jsonWebKey.K);
             }
 
@@ -136,7 +138,7 @@ namespace Microsoft.IdentityModel.Tokens
         /// </summary>
         public SecurityKey Key { get; private set; }
 
-        private static byte[] GetBytes(UInt64 i)
+        private static byte[] GetBytes(ulong i)
         {
             byte[] temp = BitConverter.GetBytes(i);
 
@@ -156,28 +158,44 @@ namespace Microsoft.IdentityModel.Tokens
         /// <returns>true if the algorithm is supported; otherwise, false.</returns>
         protected virtual bool IsSupportedAlgorithm(SecurityKey key, string algorithm)
         {
-            return key.CryptoProviderFactory.IsSupportedAlgorithm(algorithm, key);
+            if (key == null)
+                return false;
+
+            if (string.IsNullOrEmpty(algorithm))
+                return false;
+
+            if (!(algorithm.Equals(SecurityAlgorithms.Aes128KW, StringComparison.Ordinal) || algorithm.Equals(SecurityAlgorithms.Aes256KW, StringComparison.Ordinal)))
+                return false;
+
+            if (key is SymmetricSecurityKey)
+                return true;
+
+            var jsonWebKey = key as JsonWebKey;
+            if (jsonWebKey != null)
+                return (jsonWebKey.K != null && jsonWebKey.Kty == JsonWebAlgorithmsKeyTypes.Octet);
+
+            return false;
         }
 
         /// <summary>
-        /// UnWrap the wrappedKey
+        /// Unwrap the wrappedKey
         /// </summary>
         /// <param name="wrappedKey">the wrapped key to unwrap</param>
-        /// <returns>Unwrap wrappted key</returns>
+        /// <returns>Unwrap wrapped key</returns>
         /// <exception cref="ArgumentNullException">'wrappedKey' is null or empty.</exception>
         /// <exception cref="ArgumentException">The lenth of wrappedKey must be a multiple of 64 bits.</exception>
         /// <exception cref="KeyWrapUnwrapException">Failed to unwrap the wrappedKey.</exception>
-        public virtual byte[] UnWrapKey(byte[] wrappedKey)
+        public virtual byte[] UnwrapKey(byte[] wrappedKey)
         {
             if (wrappedKey == null || wrappedKey.Length == 0)
                 throw LogHelper.LogArgumentNullException(nameof(wrappedKey));
 
             if (wrappedKey.Length % 8 != 0)
-                throw LogHelper.LogExceptionMessage(new ArgumentException(nameof(wrappedKey), LogMessages.IDX10664));
+                throw LogHelper.LogExceptionMessage(new ArgumentException(nameof(wrappedKey), string.Format(CultureInfo.InvariantCulture, LogMessages.IDX10664, wrappedKey.Length << 3)));
 
             try
             {
-                return UnWrapKeyPrivate(wrappedKey, 0, wrappedKey.Length);
+                return UnwrapKeyPrivate(wrappedKey, 0, wrappedKey.Length);
             }
             catch (Exception ex)
             {
@@ -185,7 +203,7 @@ namespace Microsoft.IdentityModel.Tokens
             }
         }
 
-        private byte[] UnWrapKeyPrivate(byte[] inputBuffer, int inputOffset, int inputCount)
+        private byte[] UnwrapKeyPrivate(byte[] inputBuffer, int inputOffset, int inputCount)
         {
             /*
                 1) Initialize variables.
@@ -228,7 +246,13 @@ namespace Microsoft.IdentityModel.Tokens
             Array.Copy(inputBuffer, inputOffset + BlockSizeInBytes, r, 0, inputCount - BlockSizeInBytes);
 
             if (_symmetricAlgorithmDecryptor == null)
-                _symmetricAlgorithmDecryptor = _symmetricAlgorithm.CreateDecryptor();
+            {
+                lock (decryptorLock)
+                {
+                    if (_symmetricAlgorithmDecryptor == null)
+                        _symmetricAlgorithmDecryptor = _symmetricAlgorithm.CreateDecryptor();
+                }
+            }
 
             byte[] block = new byte[16];
 
@@ -301,8 +325,8 @@ namespace Microsoft.IdentityModel.Tokens
         /// <summary>
         /// Wrap the 'keyToWrap'
         /// </summary>
-        /// <param name="keyToWrap">the key to be wrappted</param>
-        /// <returns>The wrappted key</returns>
+        /// <param name="keyToWrap">the key to be wrapped</param>
+        /// <returns>The wrapped key</returns>
         /// <exception cref="ArgumentNullException">'keyToWrap' is null or empty.</exception>
         /// <exception cref="ArgumentException">The length of keyToWrap must be a multiple of 64 bits.</exception>
         /// <exception cref="KeyWrapWrapException">Failed to wrap the keyToWrap.</exception>
@@ -312,7 +336,7 @@ namespace Microsoft.IdentityModel.Tokens
                 throw LogHelper.LogArgumentNullException(nameof(keyToWrap));
 
             if (keyToWrap.Length %8 != 0)
-                throw LogHelper.LogExceptionMessage(new ArgumentException(nameof(keyToWrap), LogMessages.IDX10664));
+                throw LogHelper.LogExceptionMessage(new ArgumentException(nameof(keyToWrap), string.Format(CultureInfo.InvariantCulture, LogMessages.IDX10664, keyToWrap.Length << 3)));
 
             try
             {
@@ -362,7 +386,13 @@ namespace Microsoft.IdentityModel.Tokens
             Array.Copy(inputBuffer, inputOffset, r, 0, inputCount);
 
             if (_symmetricAlgorithmEncryptor == null)
-                _symmetricAlgorithmEncryptor = _symmetricAlgorithm.CreateEncryptor();
+            {
+                lock (encryptorLock)
+                {
+                    if (_symmetricAlgorithmEncryptor == null)
+                        _symmetricAlgorithmEncryptor = _symmetricAlgorithm.CreateEncryptor();
+                }
+            }
 
             byte[] block = new byte[16];
 
